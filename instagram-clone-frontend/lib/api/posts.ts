@@ -19,6 +19,11 @@ export const postsApi = {
         await api.delete(`/posts/${postId}`);
     },
 
+    getPostById: async (postId: number): Promise<Post> => {
+        const response = await api.get<Post>(`/posts/${postId}`);
+        return response.data;
+    },
+
     getUserPosts: async (username: string, page = 0, size = 20): Promise<PageResponse<Post>> => {
         const response = await api.get<PageResponse<Post>>(`/posts/user/${username}`, {
             params: { page, size },

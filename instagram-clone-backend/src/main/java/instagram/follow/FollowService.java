@@ -113,6 +113,33 @@ public class FollowService {
 		return followRepository.findByFollowerAndStatus(targetUser, FollowStatus.ACCEPTED, pageable)
 				.map(f -> toResponse(f.getFollowing(), f.getStatus()));
 	}
+
+	@Transactional(readOnly = true)
+	public FollowResponse getFollowStatus(Long currentUserId, Long targetUserId) {
+		User targetUser = userRepository.findById(targetUserId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
+		
+		if(currentUserId.equals(targetUserId)) {
+			return FollowResponse.builder()
+					.userId(targetUser.getId())
+					.username(targetUser.getUsername())
+					.avatarUrl(targetUser.getAvatarUrl())
+					.status("SELF")
+					.build();
+		}
+		
+		User currentUser = userRepository.findById(currentUserId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+		
+		return followRepository.findByFollowerAndFollowing(currentUser, targetUser)
+				.map(f -> toResponse(targetUser, f.getStatus()))
+				.orElse(FollowResponse.builder()
+						.userId(targetUser.getId())
+						.username(targetUser.getUsername())
+						.avatarUrl(targetUser.getAvatarUrl())
+						.status("NOT_FOLLOWING")
+						.build());
+	}
 	
 	private void checkListAccess(Long currentUserId, User targetUser) {
 		boolean isOwnProfile = targetUser.getId().equals(currentUserId);

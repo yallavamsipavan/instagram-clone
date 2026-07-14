@@ -2,12 +2,15 @@
 
 import Sidebar from "@/components/layout/Sidebar";
 import { useAuthStore } from "@/lib/store/authStore";
+import { useWebSocketConnection } from "@/lib/websocket/useWebSocket";
 import { useRouter } from "next/navigation";
 import React, { useEffect } from "react";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { isAuthenticated, isLoading } = useAuthStore();
+
+    useWebSocketConnection();
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) router.push('/login');
@@ -28,5 +31,5 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <Sidebar />
             <main className="flex-1 md:ml-64 pb-16 md:pb-0">{children}</main>
         </div>
-    )
+    );
 }

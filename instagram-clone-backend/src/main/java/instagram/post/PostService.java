@@ -101,6 +101,25 @@ public class PostService {
 				.map(post -> toResponse(post, currentUserId));
 	}
 	
+	@Transactional(readOnly = true)
+	public PostResponse getPostById(Long currentUserId, Long postId) {
+		Post post = postRepository.findById(postId)
+	            .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+		User postOwner = post.getUser();
+		boolean isOwnPost = postOwner.getId().equals(currentUserId);
+		
+		if(postOwner.isPrivate() && !isOwnPost) {
+			User currentUser = userRepository.findById(currentUserId)
+	                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+			
+			boolean isFollowingAccepted = followRepository.existsByFollowerAndFollowingAndStatus(currentUser, postOwner, FollowStatus.ACCEPTED);
+			
+			if(!isFollowingAccepted) throw new PrivateAccountException("This account is private");
+		}
+		
+		return toResponse(post, currentUserId);
+	}
+	
 	private PostResponse toResponse(Post post, Long currentUserId) {
 	    long likesCount = likeRepository.countByPost(post);
 	    long commentsCount = commentRepository.countByPost(post);

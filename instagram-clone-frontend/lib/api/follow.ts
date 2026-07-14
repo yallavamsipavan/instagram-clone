@@ -32,5 +32,10 @@ export const followApi = {
             params: { page, size }
         });
         return response.data;
+    },
+
+    getStatus: async (targetUserId: number): Promise<FollowResponse> => {
+        const response = await api.get<FollowResponse>(`/follows/status/${targetUserId}`);
+        return response.data;
     }
 };

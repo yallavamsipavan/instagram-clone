@@ -47,7 +47,7 @@ export interface FollowResponse {
     userId: number;
     username: string;
     avatarUrl: string | null;
-    status: 'PENDING' | 'ACCEPTED';
+    status: 'PENDING' | 'ACCEPTED' | 'NOT_FOLLOWING' | 'SELF';
 }
 
 // Post

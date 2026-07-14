@@ -36,6 +36,11 @@ public class PostController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 	
+	@GetMapping("/{postId}")
+	public ResponseEntity<PostResponse> getPostById(@AuthenticationPrincipal User currentUser, @PathVariable Long postId) {
+		return ResponseEntity.ok(postService.getPostById(currentUser.getId(), postId));
+	}
+	
 	@DeleteMapping("/{postId}")
 	public ResponseEntity<Void> deletePost(
 			@AuthenticationPrincipal User currentUser,

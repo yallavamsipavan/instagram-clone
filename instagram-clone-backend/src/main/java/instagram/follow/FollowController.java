@@ -68,4 +68,8 @@ public class FollowController {
 		Pageable pageable = PageRequest.of(page, size);
 		return ResponseEntity.ok(followService.getFollowing(currentUser.getId(), userId, pageable));
 	}
+	@GetMapping("/status/{targetUserId}") 
+	public ResponseEntity<FollowResponse> getFollowStatus(@AuthenticationPrincipal User currentUser, @PathVariable Long targetUserId) {
+		return ResponseEntity.ok(followService.getFollowStatus(currentUser.getId(), targetUserId));
+	}
 }
