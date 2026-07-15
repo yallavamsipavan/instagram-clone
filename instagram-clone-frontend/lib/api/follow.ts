@@ -37,5 +37,17 @@ export const followApi = {
     getStatus: async (targetUserId: number): Promise<FollowResponse> => {
         const response = await api.get<FollowResponse>(`/follows/status/${targetUserId}`);
         return response.data;
+    },
+
+    getIncomingStatus: async (otherUserId: number): Promise<FollowResponse> => {
+        const response = await api.get<FollowResponse>(`/follows/incoming-status/${otherUserId}`);
+        return response.data;
+    },
+
+    getPendingRequests: async (page = 0, size = 20): Promise<PageResponse<FollowResponse>> => {
+        const response = await api.get<PageResponse<FollowResponse>>('/follows/requests/pending', {
+            params: { page, size }
+        });
+        return response.data;
     }
 };

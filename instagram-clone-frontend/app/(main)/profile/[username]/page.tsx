@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { Settings, Lock } from 'lucide-react';
 import { UserProfile, Post, FollowResponse } from '@/types';
 import { userApi } from '@/lib/api/user';
@@ -12,21 +13,24 @@ import Button from '@/components/ui/Button';
 import PostGrid from '@/components/profile/PostGrid';
 import FollowListModal from '@/components/profile/FollowListModal';
 import EditProfileModal from '@/components/profile/EditProfileModal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function ProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params.username;
 
   const { username: currentUsername, setUser } = useAuthStore();
-  const isOwnProfile = (currentUsername === username);
+  const isOwnProfile = currentUsername === username;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [followStatus, setFollowStatus] = useState<FollowResponse['status'] | null>(null);
+  const [incomingStatus, setIncomingStatus] = useState<FollowResponse['status'] | null>(null);
   const [postsAccessDenied, setPostsAccessDenied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
-  const [activeModal, setActiveModal] = useState<'followers' | 'following' | 'edit' | null>(null);
+  const [isRequestActionLoading, setIsRequestActionLoading] = useState(false);
+  const [activeModal, setActiveModal] = useState<'followers' | 'following' | 'edit' | 'unfollowConfirm' | null>(null);
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
@@ -37,6 +41,9 @@ export default function ProfilePage() {
       if (!isOwnProfile) {
         const status = await followApi.getStatus(profileData.id);
         setFollowStatus(status.status);
+
+        const incoming = await followApi.getIncomingStatus(profileData.id);
+        setIncomingStatus(incoming.status);
       }
 
       setPostsAccessDenied(false);
@@ -59,24 +66,61 @@ export default function ProfilePage() {
 
   const handleFollowAction = async () => {
     if (!profile || isFollowActionLoading) return;
-    setIsFollowActionLoading(true);
 
+    // Unfollowing (either accepted or a pending outgoing request) needs confirmation
+    if (followStatus === 'ACCEPTED' || followStatus === 'PENDING') {
+      setActiveModal('unfollowConfirm');
+      return;
+    }
+
+    setIsFollowActionLoading(true);
     try {
-      if (followStatus === 'NOT_FOLLOWING') {
-        const result = await followApi.sendRequest(profile.id);
-        setFollowStatus(result.status);
-        if (result.status === 'ACCEPTED') {
-          loadProfile(); // refresh posts + counts since we can now see them
-        }
-      } else if (followStatus === 'PENDING' || followStatus === 'ACCEPTED') {
-        await followApi.unfollow(profile.id);
-        setFollowStatus('NOT_FOLLOWING');
-        loadProfile();
-      }
+      const result = await followApi.sendRequest(profile.id);
+      setFollowStatus(result.status);
+      if (result.status === 'ACCEPTED') loadProfile();
     } finally {
       setIsFollowActionLoading(false);
     }
   };
+
+  const confirmUnfollow = async () => {
+    if (!profile) return;
+    setIsFollowActionLoading(true);
+    try {
+      await followApi.unfollow(profile.id);
+      setFollowStatus('NOT_FOLLOWING');
+      setActiveModal(null);
+      loadProfile();
+    } finally {
+      setIsFollowActionLoading(false);
+    }
+  };
+
+  const handleAcceptIncoming = async () => {
+    if (!profile || isRequestActionLoading) return;
+    setIsRequestActionLoading(true);
+    try {
+      await followApi.accept(profile.id);
+      setIncomingStatus('ACCEPTED');
+    } finally {
+      setIsRequestActionLoading(false);
+    }
+  };
+
+  const handleDeclineIncoming = async () => {
+    if (!profile || isRequestActionLoading) return;
+    setIsRequestActionLoading(true);
+    try {
+      await followApi.reject(profile.id);
+      setIncomingStatus('NOT_FOLLOWING');
+    } finally {
+      setIsRequestActionLoading(false);
+    }
+  };
+
+  // Followers/Following lists and DMs are only accessible when :
+  // the account is public, OR it's your own profile, OR you are an accepted follower
+  const canViewListsAndMessage = isOwnProfile || !profile?.isPrivate || followStatus === 'ACCEPTED';
 
   if (isLoading) {
     return (
@@ -124,14 +168,45 @@ export default function ProfilePage() {
                 Edit Profile
               </button>
             ) : (
-              <Button
-                variant={followStatus === 'ACCEPTED' || followStatus === 'PENDING' ? 'secondary' : 'primary'}
-                onClick={handleFollowAction}
-                isLoading={isFollowActionLoading}
-                className="!px-6"
-              >
-                {followStatus === 'ACCEPTED' ? 'Following' : followStatus === 'PENDING' ? 'Requested' : 'Follow'}
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                {/* This person has sent ME a pending follow request */}
+                {incomingStatus === 'PENDING' && (
+                  <>
+                    <Button
+                      onClick={handleAcceptIncoming}
+                      isLoading={isRequestActionLoading}
+                      className="!px-5"
+                    >
+                      Accept Request
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleDeclineIncoming}
+                      disabled={isRequestActionLoading}
+                      className="!px-5"
+                    >
+                      Decline
+                    </Button>
+                  </>
+                )}
+
+                <Button
+                  variant={followStatus === 'ACCEPTED' || followStatus === 'PENDING' ? 'secondary' : 'primary'}
+                  onClick={handleFollowAction}
+                  isLoading={isFollowActionLoading}
+                  className="!px-6"
+                >
+                  {followStatus === 'ACCEPTED' ? 'Following' : followStatus === 'PENDING' ? 'Requested' : 'Follow'}
+                </Button>
+
+                {canViewListsAndMessage && (
+                  <Link href={`/messages/${profile.id}`}>
+                    <Button variant="secondary" className="!px-6">
+                      Message
+                    </Button>
+                  </Link>
+                )}
+              </div>
             )}
           </div>
 
@@ -139,12 +214,32 @@ export default function ProfilePage() {
             <span className="text-zinc-300">
               <strong className="text-zinc-100">{profile.postsCount}</strong> posts
             </span>
-            <button onClick={() => setActiveModal('followers')} className="text-zinc-300 hover:text-white transition-colors">
-              <strong className="text-zinc-100">{profile.followersCount}</strong> followers
-            </button>
-            <button onClick={() => setActiveModal('following')} className="text-zinc-300 hover:text-white transition-colors">
-              <strong className="text-zinc-100">{profile.followingCount}</strong> following
-            </button>
+
+            {canViewListsAndMessage ? (
+              <button
+                onClick={() => setActiveModal('followers')}
+                className="text-zinc-300 hover:text-white transition-colors"
+              >
+                <strong className="text-zinc-100">{profile.followersCount}</strong> followers
+              </button>
+            ) : (
+              <span className="text-zinc-300 cursor-default">
+                <strong className="text-zinc-100">{profile.followersCount}</strong> followers
+              </span>
+            )}
+
+            {canViewListsAndMessage ? (
+              <button
+                onClick={() => setActiveModal('following')}
+                className="text-zinc-300 hover:text-white transition-colors"
+              >
+                <strong className="text-zinc-100">{profile.followingCount}</strong> following
+              </button>
+            ) : (
+              <span className="text-zinc-300 cursor-default">
+                <strong className="text-zinc-100">{profile.followingCount}</strong> following
+              </span>
+            )}
           </div>
 
           {profile.fullName && <p className="text-sm font-semibold text-zinc-200">{profile.fullName}</p>}
@@ -185,6 +280,16 @@ export default function ProfilePage() {
             setProfile(updated);
             setUser(updated);
           }}
+        />
+      )}
+      {activeModal === 'unfollowConfirm' && (
+        <ConfirmModal
+          title={`Unfollow @${profile.username}?`}
+          message="You'll need to send a new request if this account is private."
+          confirmLabel="Unfollow"
+          isDangerous
+          onConfirm={confirmUnfollow}
+          onCancel={() => setActiveModal(null)}
         />
       )}
     </div>

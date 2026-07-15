@@ -2,22 +2,31 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Post } from '@/types';
 import { likesApi } from '@/lib/api/likes';
+import { postsApi } from '@/lib/api/posts';
+import { useAuthStore } from '@/lib/store/authStore';
 import CommentSection from './CommentSection';
-
+import SharePostModal from './SharePostModal';
 
 interface PostCardProps {
   post: Post;
+  onDeleted?: (postId: number) => void;
 }
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({ post, onDeleted }: PostCardProps) {
+  const currentUsername = useAuthStore((state) => state.username);
+  const isOwnPost = currentUsername === post.username;
+
   const [liked, setLiked] = useState(post.likedByCurrentUser);
   const [likesCount, setLikesCount] = useState(post.likesCount);
   const [showComments, setShowComments] = useState(false);
   const [commentsCount, setCommentsCount] = useState(post.commentsCount);
   const [isLiking, setIsLiking] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
 
   const handleLikeToggle = async () => {
     if (isLiking) return;
@@ -26,19 +35,31 @@ export default function PostCard({ post }: PostCardProps) {
     const previousLiked = liked;
     const previousCount = likesCount;
 
-    // optimistic update
-    setLiked(!liked)
+    setLiked(!liked);
     setLikesCount(liked ? likesCount - 1 : likesCount + 1);
 
     try {
-      if (previousLiked) await likesApi.unlikePost(post.id);
-      else await likesApi.likePost(post.id);
+      if (previousLiked) {
+        await likesApi.unlikePost(post.id);
+      } else {
+        await likesApi.likePost(post.id);
+      }
     } catch {
-      // revert on failure
       setLiked(previousLiked);
       setLikesCount(previousCount);
     } finally {
       setIsLiking(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this post? This cannot be undone.')) return;
+    try {
+      await postsApi.deletePost(post.id);
+      setIsDeleted(true);
+      onDeleted?.(post.id);
+    } catch {
+      // ignore for now
     }
   };
 
@@ -53,6 +74,8 @@ export default function PostCard({ post }: PostCardProps) {
     if (days < 7) return `${days}d`;
     return new Date(dateString).toLocaleDateString();
   };
+
+  if (isDeleted) return null;
 
   return (
     <article className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden mb-6 animate-fade-in-up">
@@ -75,9 +98,28 @@ export default function PostCard({ post }: PostCardProps) {
             {post.username}
           </span>
         </Link>
-        <button className="text-zinc-500 hover:text-zinc-300 transition-colors">
-          <MoreHorizontal size={20} />
-        </button>
+
+        <div className="relative">
+          <button
+            onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            <MoreHorizontal size={20} />
+          </button>
+          {showOptionsMenu && isOwnPost && (
+            <div className="absolute right-0 top-7 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-10 w-36">
+              <button
+                onClick={() => {
+                  handleDelete();
+                  setShowOptionsMenu(false);
+                }}
+                className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-red-400 hover:bg-zinc-700 transition-colors"
+              >
+                <Trash2 size={13} /> Delete Post
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Media */}
@@ -93,10 +135,7 @@ export default function PostCard({ post }: PostCardProps) {
       {/* Actions */}
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button
-            onClick={handleLikeToggle}
-            className="transition-transform duration-150 active:scale-90"
-          >
+          <button onClick={handleLikeToggle} className="transition-transform duration-150 active:scale-90">
             <Heart
               size={26}
               className={liked ? 'fill-pink-500 text-pink-500' : 'text-zinc-200 hover:text-zinc-400'}
@@ -108,7 +147,10 @@ export default function PostCard({ post }: PostCardProps) {
           >
             <MessageCircle size={26} className="text-zinc-200 hover:text-zinc-400" />
           </button>
-          <button className="transition-transform duration-150 active:scale-90">
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="transition-transform duration-150 active:scale-90"
+          >
             <Send size={24} className="text-zinc-200 hover:text-zinc-400" />
           </button>
         </div>
@@ -117,12 +159,10 @@ export default function PostCard({ post }: PostCardProps) {
         </button>
       </div>
 
-      {/* Likes count */}
       <div className="px-4 text-sm font-semibold text-zinc-100">
         {likesCount.toLocaleString()} {likesCount === 1 ? 'like' : 'likes'}
       </div>
 
-      {/* Caption */}
       {post.caption && (
         <div className="px-4 pt-1 text-sm text-zinc-200">
           <Link href={`/profile/${post.username}`} className="font-semibold mr-2 hover:underline">
@@ -132,7 +172,6 @@ export default function PostCard({ post }: PostCardProps) {
         </div>
       )}
 
-      {/* Comments toggle */}
       {commentsCount > 0 && !showComments && (
         <button
           onClick={() => setShowComments(true)}
@@ -147,10 +186,11 @@ export default function PostCard({ post }: PostCardProps) {
       </div>
 
       {showComments && (
-        <CommentSection
-          postId={post.id}
-          onCommentAdded={() => setCommentsCount((c) => c + 1)}
-        />
+        <CommentSection postId={post.id} onCommentAdded={() => setCommentsCount((c) => c + 1)} />
+      )}
+
+      {showShareModal && (
+        <SharePostModal postId={post.id} onClose={() => setShowShareModal(false)} />
       )}
     </article>
   );

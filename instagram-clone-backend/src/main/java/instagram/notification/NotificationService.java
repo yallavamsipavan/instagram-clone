@@ -24,6 +24,9 @@ public class NotificationService {
 	public void notify(User recipient, User actor, NotificationType type, Long entityId) {
 		if(recipient.getId().equals(actor.getId())) return;
 		
+		boolean alreadyExists = notificationRepository.existsByUserAndActorAndTypeAndEntityId(recipient, actor, type, entityId);
+		if(alreadyExists) return;
+		
 		Notification notification = Notification.builder()
 				.user(recipient)
 				.actor(actor)

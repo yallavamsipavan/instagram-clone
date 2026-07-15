@@ -141,6 +141,32 @@ public class FollowService {
 						.build());
 	}
 	
+	@Transactional(readOnly = true)
+	public Page<FollowResponse> getPendingRequests(Long currentUserId, Pageable pageable) {
+		User currentUser = userRepository.findById(currentUserId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
+		
+		return followRepository.findByFollowingAndStatus(currentUser, FollowStatus.PENDING, pageable)
+				.map(f -> toResponse(f.getFollower(), f.getStatus()));
+	}
+	
+	@Transactional(readOnly = true)
+	public FollowResponse getIncomingReduestStatus(Long currentUserId, Long otherUserId) {
+		User currentUser = userRepository.findById(currentUserId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+	    User otherUser = userRepository.findById(otherUserId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+	    return followRepository.findByFollowerAndFollowing(otherUser, currentUser)
+	    		.map(f -> toResponse(otherUser, f.getStatus()))
+	    		.orElse(FollowResponse.builder()
+	    				.userId(otherUser.getId())
+	    				.username(otherUser.getUsername())
+	    				.avatarUrl(otherUser.getAvatarUrl())
+	    				.status("NOT_FOLLOWING")
+	    				.build());
+	}
+	
 	private void checkListAccess(Long currentUserId, User targetUser) {
 		boolean isOwnProfile = targetUser.getId().equals(currentUserId);
 		if(targetUser.isPrivate() && !isOwnProfile) {

@@ -11,6 +11,7 @@ import {
     MessageCircle,
     User,
     LogOut,
+    UserPlus,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 import { notificationsApi } from '@/lib/api/notifications';
@@ -20,6 +21,7 @@ const navItems = [
     { href: '/search', label: 'Search', icon: Search },
     { href: '/create', label: 'Create', icon: PlusSquare },
     { href: '/notifications', label: 'Notifications', icon: Heart },
+    { href: '/requests', label: 'Requests', icon: UserPlus },
     { href: '/messages', label: 'Messages', icon: MessageCircle }
 ];
 
