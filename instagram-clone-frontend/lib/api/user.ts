@@ -20,5 +20,16 @@ export const userApi = {
     search: async (query: string): Promise<UserProfile[]> => {
         const response = await api.get<UserProfile[]>('/users/search', { params: { query } });
         return response.data;
+    },
+
+    uploadAvatar: async (file: File): Promise<UserProfile> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await api.post<UserProfile>('/users/me/avatar', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return response.data;
     }
 };

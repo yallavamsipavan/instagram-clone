@@ -86,6 +86,6 @@ public class FollowController {
 	
 	@GetMapping("/incoming-status/{otherUserId}")
 	public ResponseEntity<FollowResponse> getIncomingRequestStatus(@AuthenticationPrincipal User currentUser, @PathVariable Long otherUserId) {
-		return ResponseEntity.ok(followService.getIncomingReduestStatus(currentUser.getId(), otherUserId));
+		return ResponseEntity.ok(followService.getIncomingRequestStatus(currentUser.getId(), otherUserId));
 	}
 }

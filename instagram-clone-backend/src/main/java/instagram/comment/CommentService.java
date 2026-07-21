@@ -56,6 +56,7 @@ public class CommentService {
         commentRepository.save(comment);
         
         notificationService.notify(post.getUser(), user, NotificationType.COMMENT, comment.getId());
+        
         return toResponse(comment, userId);
 	}
 	
@@ -65,6 +66,8 @@ public class CommentService {
 				.orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 		
 		if(!comment.getUser().getId().equals(userId)) throw new IllegalArgumentException("You can only delete your own comments");
+		
+		notificationService.removeNotification(comment.getPost().getUser(), comment.getUser(), NotificationType.COMMENT, comment.getId());
 		
 		commentRepository.delete(comment);
 	}
@@ -109,6 +112,7 @@ public class CommentService {
 	private CommentResponse toResponse(Comment comment, Long currentUserId) {
 		long likesCount = likeRepository.countByComment(comment);
 		long repliesCount = commentRepository.countByParentComment(comment);
+		
 		boolean likedByCurrentUser = false;
 		if(currentUserId != null) {
 			User currentUser = userRepository.findById(currentUserId).orElse(null);

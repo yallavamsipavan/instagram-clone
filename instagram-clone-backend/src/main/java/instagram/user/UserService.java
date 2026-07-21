@@ -5,7 +5,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import instagram.common.FileStorageService;
 import instagram.common.exception.ResourceNotFoundException;
 import instagram.follow.FollowRepository;
 import instagram.follow.FollowStatus;
@@ -21,6 +23,7 @@ public class UserService {
 	private final UserRepository userRepository;
 	private final FollowRepository followRepository;
 	private final PostRepository postRepository;
+	private final FileStorageService fileStorageService;
 	
 	public UserProfileResponse getProfileByUsername(String username) {
 		User user = userRepository.findByUsername(username)
@@ -47,6 +50,23 @@ public class UserService {
 		user.setPrivate(!user.isPrivate());
 		userRepository.save(user);
 		return toProfileResponse(user);
+	}
+	
+	@Transactional
+	public UserProfileResponse uploadAvatar(Long userId, MultipartFile file) {
+	    User user = userRepository.findById(userId)
+	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+	    String contentType = file.getContentType();
+	    if (contentType == null || !contentType.startsWith("image/")) {
+	        throw new IllegalArgumentException("Avatar must be an image file");
+	    }
+
+	    String avatarUrl = fileStorageService.store(file);
+	    user.setAvatarUrl(avatarUrl);
+	    userRepository.save(user);
+
+	    return toProfileResponse(user);
 	}
 	
 	public List<UserProfileResponse> searchUsers(String query) {

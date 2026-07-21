@@ -36,11 +36,11 @@ public class Notification {
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "user_id", nullable = false)
-	private User user;
+	private User user; // recipient
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "actor_id", nullable = false)
-	private User actor;
+	private User actor; // who triggered it
 	
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 30)
@@ -50,7 +50,11 @@ public class Notification {
 	private Long entityId;
 	
 	@Column(name = "is_read", nullable = false)
-	private boolean isRead;
+	@Builder.Default
+	private boolean isRead = false;
+	
+	@Column(name = "read_at")
+	private LocalDateTime readAt;
 	
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;

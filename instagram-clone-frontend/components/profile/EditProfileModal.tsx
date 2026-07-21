@@ -1,11 +1,11 @@
 "use client";
 
-import { userApi } from "@/lib/api/user";
-import { UserProfile } from "@/types";
-import { useState } from "react";
-import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import { X } from "lucide-react";
+import { useState, useRef } from 'react';
+import { X, Camera } from 'lucide-react';
+import { UserProfile } from '@/types';
+import { userApi } from '@/lib/api/user';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
 
 interface EditProfileModalProps {
   profile: UserProfile;
@@ -14,10 +14,38 @@ interface EditProfileModalProps {
 }
 
 export default function EditProfileModal({ profile, onClose, onSaved }: EditProfileModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [fullName, setFullName] = useState(profile.fullName || '');
   const [bio, setBio] = useState(profile.bio || '');
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile.avatarUrl);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [error, setError] = useState('');
+
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file for your avatar.');
+      return;
+    }
+
+    setAvatarPreview(URL.createObjectURL(file));
+    setIsUploadingAvatar(true);
+    setError('');
+
+    try {
+      const updated = await userApi.uploadAvatar(file);
+      onSaved(updated);
+    } catch {
+      setError('Failed to upload avatar. Please try again.');
+      setAvatarPreview(profile.avatarUrl);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -47,6 +75,45 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
           <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
+        </div>
+
+        <div className="flex flex-col items-center mb-5">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingAvatar}
+            className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-400 p-[2px] group"
+          >
+            <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden">
+              {avatarPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl font-semibold text-zinc-300">
+                  {profile.username.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+              {isUploadingAvatar ? (
+                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Camera size={20} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              )}
+            </div>
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="text-xs text-pink-400 font-semibold mt-2 hover:text-pink-300 transition-colors"
+          >
+            Change photo
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarSelect}
+          />
         </div>
 
         <div className="space-y-4">

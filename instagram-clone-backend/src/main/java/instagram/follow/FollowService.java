@@ -48,7 +48,12 @@ public class FollowService {
 		
 		followRepository.save(follow);
 		
-		notificationService.notify(following, follower,
+		// Clean up any stale follow notifications from a previous follow/unfollow cycle
+	    // before creating a fresh one, so only the latest action is ever shown.
+		notificationService.removeAllOfType(following, follower, NotificationType.FOLLOW_REQUEST);
+		notificationService.removeAllOfType(following, follower, NotificationType.FOLLOW_ACCEPTED);
+		
+		notificationService.notifyFresh(following, follower,
 				status == FollowStatus.PENDING ? NotificationType.FOLLOW_REQUEST : NotificationType.FOLLOW_ACCEPTED,
 				follow.getId());
 		
@@ -69,7 +74,10 @@ public class FollowService {
 		follow.setStatus(FollowStatus.ACCEPTED);
 		followRepository.save(follow);
 		
-		notificationService.notify(followerUser, currentUser, NotificationType.FOLLOW_ACCEPTED, follow.getId());
+		notificationService.removeAllOfType(followerUser, currentUser, NotificationType.FOLLOW_REQUEST);
+		notificationService.removeAllOfType(followerUser, currentUser, NotificationType.FOLLOW_ACCEPTED);
+		
+		notificationService.notifyFresh(followerUser, currentUser, NotificationType.FOLLOW_ACCEPTED, follow.getId());
 		
 		return toResponse(followerUser, FollowStatus.ACCEPTED);
 	}
@@ -82,6 +90,9 @@ public class FollowService {
 				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
 		Follow follow = followRepository.findByFollowerAndFollowing(followerUser, currentUser)
 				.orElseThrow(() -> new ResourceNotFoundException("Follow request not found"));
+		
+		notificationService.removeNotification(currentUser, followerUser, NotificationType.FOLLOW_REQUEST, follow.getId());
+		
 		followRepository.delete(follow);
 	}
 	
@@ -91,7 +102,13 @@ public class FollowService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 		User following = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-		followRepository.deleteByFollowerAndFollowing(follower, following);
+		
+		followRepository.findByFollowerAndFollowing(follower, following)
+			.ifPresent(follow -> {
+				notificationService.removeNotification(following, follower, NotificationType.FOLLOW_REQUEST, follow.getId());
+				followRepository.delete(follow);
+			}
+		);
 	}
 	
 	@Transactional(readOnly = true)
@@ -142,16 +159,7 @@ public class FollowService {
 	}
 	
 	@Transactional(readOnly = true)
-	public Page<FollowResponse> getPendingRequests(Long currentUserId, Pageable pageable) {
-		User currentUser = userRepository.findById(currentUserId)
-				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
-		
-		return followRepository.findByFollowingAndStatus(currentUser, FollowStatus.PENDING, pageable)
-				.map(f -> toResponse(f.getFollower(), f.getStatus()));
-	}
-	
-	@Transactional(readOnly = true)
-	public FollowResponse getIncomingReduestStatus(Long currentUserId, Long otherUserId) {
+	public FollowResponse getIncomingRequestStatus(Long currentUserId, Long otherUserId) {
 		User currentUser = userRepository.findById(currentUserId)
 	            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 	    User otherUser = userRepository.findById(otherUserId)
@@ -165,6 +173,15 @@ public class FollowService {
 	    				.avatarUrl(otherUser.getAvatarUrl())
 	    				.status("NOT_FOLLOWING")
 	    				.build());
+	}
+	
+	@Transactional(readOnly = true)
+	public Page<FollowResponse> getPendingRequests(Long currentUserId, Pageable pageable) {
+		User currentUser = userRepository.findById(currentUserId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found"));
+		
+		return followRepository.findByFollowingAndStatus(currentUser, FollowStatus.PENDING, pageable)
+				.map(f -> toResponse(f.getFollower(), f.getStatus()));
 	}
 	
 	private void checkListAccess(Long currentUserId, User targetUser) {

@@ -28,6 +28,10 @@ export default function NotificationsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Fetching this list is what triggers the backend to mark unread items as read
+    // (with a fresh readAt timestamp) and clean up anything read 48+ hours ago.
+    // This response still reflects the pre-open unread state, so today's new
+    // notifications appear highlighted one last time on this load.
     notificationsApi
       .getNotifications()
       .then((res) => setNotifications(res.content))
@@ -35,30 +39,25 @@ export default function NotificationsPage() {
 
     const handleNewNotification = (payload: unknown) => {
       const notification = payload as Notification;
-      setNotifications((prev) => [notification, ...prev]);
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notification.id)) return prev;
+        return [notification, ...prev];
+      });
+    };
+
+    const handleDeleteNotification = (payload: unknown) => {
+      const notificationId = payload as number;
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     };
 
     subscribeToDestination('/user/queue/notifications', handleNewNotification);
+    subscribeToDestination('/user/queue/notifications/deleted', handleDeleteNotification);
 
     return () => {
       unsubscribeFromDestination('/user/queue/notifications', handleNewNotification);
+      unsubscribeFromDestination('/user/queue/notifications/deleted', handleDeleteNotification);
     };
   }, []);
-
-  const handleClick = async (notification: Notification) => {
-    if (!notification.isRead) {
-      try {
-        await notificationsApi.markAsRead(notification.id);
-        setNotifications((prev) =>
-          prev.map((n) =>
-            (n.id === notification.id ? { ...n, isRead: true } : n)
-          )
-        );
-      } catch {
-        // ignore
-      }
-    }
-  };
 
   const timeAgo = (dateString: string) => {
     const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
@@ -85,14 +84,21 @@ export default function NotificationsPage() {
         <div className="space-y-1">
           {notifications.map((notification) => {
             const Icon = iconMap[notification.type];
+            const isUnread = !notification.isRead;
+
             return (
               <Link
                 key={notification.id}
                 href={`/profile/${notification.actorUsername}`}
-                onClick={() => handleClick(notification)}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors animate-fade-in-up ${notification.isRead ? 'hover:bg-zinc-900' : 'bg-zinc-900/60 hover:bg-zinc-900'
+                className={`relative flex items-center gap-3 px-3 py-3 rounded-xl transition-colors animate-fade-in-up ${isUnread
+                  ? 'bg-pink-500/[0.07] hover:bg-pink-500/[0.12] border border-pink-500/20'
+                  : 'hover:bg-zinc-900 border border-transparent'
                   }`}
               >
+                {isUnread && (
+                  <div className="absolute left-0 top-3 bottom-3 w-[3px] bg-gradient-to-b from-purple-400 via-pink-400 to-orange-300 rounded-full" />
+                )}
+
                 <div className="relative shrink-0">
                   <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-400 p-[2px]">
                     <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden">
@@ -116,14 +122,16 @@ export default function NotificationsPage() {
                   </div>
                 </div>
 
-                <p className="text-sm text-zinc-200 flex-1">
+                <p className={`text-sm flex-1 ${isUnread ? 'text-zinc-100 font-medium' : 'text-zinc-400'}`}>
                   <span className="font-semibold">{notification.actorUsername}</span>{' '}
                   {messageMap[notification.type]}
                 </p>
 
-                <span className="text-xs text-zinc-600 shrink-0">{timeAgo(notification.createdAt)}</span>
+                <span className={`text-xs shrink-0 ${isUnread ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                  {timeAgo(notification.createdAt)}
+                </span>
 
-                {!notification.isRead && <div className="w-2 h-2 bg-pink-500 rounded-full shrink-0" />}
+                {isUnread && <div className="w-2 h-2 bg-pink-500 rounded-full shrink-0 animate-pulse" />}
               </Link>
             );
           })}

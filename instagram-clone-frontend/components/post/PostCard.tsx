@@ -186,7 +186,11 @@ export default function PostCard({ post, onDeleted }: PostCardProps) {
       </div>
 
       {showComments && (
-        <CommentSection postId={post.id} onCommentAdded={() => setCommentsCount((c) => c + 1)} />
+        <CommentSection
+          postId={post.id}
+          onCommentAdded={() => setCommentsCount((c) => c + 1)}
+          onCommentRemoved={() => setCommentsCount((c) => Math.max(0, c - 1))}
+        />
       )}
 
       {showShareModal && (
