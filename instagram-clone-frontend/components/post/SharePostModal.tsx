@@ -6,6 +6,7 @@ import { FollowResponse } from '@/types';
 import { useAuthStore } from '@/lib/store/authStore';
 import { followApi } from '@/lib/api/follow';
 import { messagesApi } from '@/lib/api/messages';
+import { useToastStore } from '@/lib/store/toastStore';
 
 interface SharePostModalProps {
   postId: number;
@@ -14,6 +15,7 @@ interface SharePostModalProps {
 
 export default function SharePostModal({ postId, onClose }: SharePostModalProps) {
   const currentUser = useAuthStore((state) => state.user);
+  const showToast = useToastStore((state) => state.showToast);
   const [following, setFollowing] = useState<FollowResponse[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -33,8 +35,9 @@ export default function SharePostModal({ postId, onClose }: SharePostModalProps)
     try {
       await messagesApi.sendMessage(userId, { sharedPostId: postId });
       setSentTo((prev) => new Set(prev).add(userId));
+      showToast('Post shared!', 'success');
     } catch {
-      // ignore for now
+      showToast('Failed to share post. Please try again.', 'error');
     } finally {
       setSendingTo(null);
     }

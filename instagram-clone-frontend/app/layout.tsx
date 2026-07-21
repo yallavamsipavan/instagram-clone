@@ -2,20 +2,27 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AuthInitializer from "@/components/AuthInitializer";
-import React from "react";
+import ToastContainer from "@/components/ui/ToastContainer";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Instagram Clone",
-  description: "A full-stack Instagram clone"
+  description: "A full-stack Instagram clone",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-white text-gray-900`}>
-        <AuthInitializer>{ children }</AuthInitializer>
+      <body className={`${inter.className} bg-zinc-950 text-gray-100`}>
+        <AuthInitializer>
+          {children}
+          <ToastContainer />
+        </AuthInitializer>
       </body>
     </html>
   );

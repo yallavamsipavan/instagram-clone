@@ -9,6 +9,7 @@ import { postsApi } from '@/lib/api/posts';
 import { useAuthStore } from '@/lib/store/authStore';
 import CommentSection from './CommentSection';
 import SharePostModal from './SharePostModal';
+import { useToastStore } from '@/lib/store/toastStore';
 
 interface PostCardProps {
   post: Post;
@@ -18,6 +19,7 @@ interface PostCardProps {
 export default function PostCard({ post, onDeleted }: PostCardProps) {
   const currentUsername = useAuthStore((state) => state.username);
   const isOwnPost = currentUsername === post.username;
+  const showToast = useToastStore((state) => state.showToast);
 
   const [liked, setLiked] = useState(post.likedByCurrentUser);
   const [likesCount, setLikesCount] = useState(post.likesCount);
@@ -58,8 +60,9 @@ export default function PostCard({ post, onDeleted }: PostCardProps) {
       await postsApi.deletePost(post.id);
       setIsDeleted(true);
       onDeleted?.(post.id);
+      showToast('Post deleted', 'success');
     } catch {
-      // ignore for now
+      showToast('Failed to delete post. Please try again.', 'error');
     }
   };
 

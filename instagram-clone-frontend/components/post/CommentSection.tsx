@@ -7,6 +7,7 @@ import { Comment } from '@/types';
 import { commentsApi } from '@/lib/api/comments';
 import { likesApi } from '@/lib/api/likes';
 import { useAuthStore } from '@/lib/store/authStore';
+import { useToastStore } from '@/lib/store/toastStore';
 
 interface CommentSectionProps {
   postId: number;
@@ -16,6 +17,7 @@ interface CommentSectionProps {
 
 export default function CommentSection({ postId, onCommentAdded, onCommentRemoved }: CommentSectionProps) {
   const currentUsername = useAuthStore((state) => state.username);
+  const showToast = useToastStore((state) => state.showToast);
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -46,7 +48,7 @@ export default function CommentSection({ postId, onCommentAdded, onCommentRemove
       setNewComment('');
       onCommentAdded?.();
     } catch {
-      // silently fail for now
+      showToast('Failed to add comment. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -69,7 +71,7 @@ export default function CommentSection({ postId, onCommentAdded, onCommentRemove
         onCommentRemoved?.();
       }
     } catch {
-      // ignore for now
+      showToast('Failed to delete comment. Please try again.', 'error');
     }
   };
 
@@ -150,7 +152,7 @@ export default function CommentSection({ postId, onCommentAdded, onCommentRemove
       setReplyingTo(null);
       setOpenReplies((prev) => new Set(prev).add(parentCommentId));
     } catch {
-      // ignore for now
+      showToast('Failed to add comment. Please try again.', 'error');
     }
   };
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef } from 'react';
-import { X, Camera } from 'lucide-react';
+import { X, Camera, Lock, Globe } from 'lucide-react';
 import { UserProfile } from '@/types';
 import { userApi } from '@/lib/api/user';
+import { useToastStore } from '@/lib/store/toastStore';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 
@@ -15,12 +16,15 @@ interface EditProfileModalProps {
 
 export default function EditProfileModal({ profile, onClose, onSaved }: EditProfileModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const showToast = useToastStore((state) => state.showToast);
 
   const [fullName, setFullName] = useState(profile.fullName || '');
   const [bio, setBio] = useState(profile.bio || '');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile.avatarUrl);
+  const [isPrivate, setIsPrivate] = useState(profile.isPrivate);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isTogglingPrivacy, setIsTogglingPrivacy] = useState(false);
   const [error, setError] = useState('');
 
   const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,22 +32,36 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file for your avatar.');
+      showToast('Please select an image file for your avatar.', 'error');
       return;
     }
 
     setAvatarPreview(URL.createObjectURL(file));
     setIsUploadingAvatar(true);
-    setError('');
 
     try {
       const updated = await userApi.uploadAvatar(file);
       onSaved(updated);
+      showToast('Avatar updated', 'success');
     } catch {
-      setError('Failed to upload avatar. Please try again.');
+      showToast('Failed to upload avatar. Please try again.', 'error');
       setAvatarPreview(profile.avatarUrl);
     } finally {
       setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleTogglePrivacy = async () => {
+    setIsTogglingPrivacy(true);
+    try {
+      const updated = await userApi.togglePrivacy();
+      setIsPrivate(updated.isPrivate);
+      onSaved(updated);
+      showToast(updated.isPrivate ? 'Account is now private' : 'Account is now public', 'success');
+    } catch {
+      showToast('Failed to update privacy setting.', 'error');
+    } finally {
+      setIsTogglingPrivacy(false);
     }
   };
 
@@ -53,6 +71,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
     try {
       const updated = await userApi.updateProfile({ fullName, bio });
       onSaved(updated);
+      showToast('Profile updated', 'success');
       onClose();
     } catch {
       setError('Failed to update profile. Please try again.');
@@ -67,7 +86,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-6 animate-fade-in-up"
+        className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
@@ -132,6 +151,29 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
               className="w-full bg-zinc-800/60 text-zinc-100 placeholder:text-zinc-500 text-sm rounded-lg px-4 py-2.5 border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-pink-500/50 resize-none transition-all"
             />
             <p className="text-xs text-zinc-600 text-right mt-1">{bio.length}/500</p>
+          </div>
+
+          <div className="flex items-center justify-between bg-zinc-800/40 border border-zinc-800 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              {isPrivate ? <Lock size={16} className="text-zinc-400" /> : <Globe size={16} className="text-zinc-400" />}
+              <div>
+                <p className="text-sm text-zinc-200 font-medium">Private Account</p>
+                <p className="text-[11px] text-zinc-500">
+                  {isPrivate ? 'Only approved followers can see your posts' : 'Anyone can see your posts'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleTogglePrivacy}
+              disabled={isTogglingPrivacy}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${isPrivate ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-zinc-700'
+                }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200 ${isPrivate ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+              />
+            </button>
           </div>
 
           {error && <p className="text-sm text-red-400 text-center">{error}</p>}

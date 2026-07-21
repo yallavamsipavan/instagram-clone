@@ -6,6 +6,7 @@ import { Heart, MessageCircle, UserPlus, UserCheck } from 'lucide-react';
 import { Notification } from '@/types';
 import { notificationsApi } from '@/lib/api/notifications';
 import { subscribeToDestination, unsubscribeFromDestination } from '@/lib/websocket/socketClient';
+import { ListItemSkeleton } from '@/components/ui/Skeleton';
 
 const iconMap = {
   FOLLOW_REQUEST: UserPlus,
@@ -75,8 +76,10 @@ export default function NotificationsPage() {
       <h1 className="text-xl font-semibold text-zinc-100 mb-5">Notifications</h1>
 
       {isLoading ? (
-        <div className="flex justify-center py-10">
-          <div className="w-6 h-6 border-2 border-zinc-700 border-t-pink-400 rounded-full animate-spin" />
+        <div className="space-y-1">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <ListItemSkeleton key={i} />
+          ))}
         </div>
       ) : notifications.length === 0 ? (
         <p className="text-center text-zinc-500 text-sm py-10">No notifications yet</p>

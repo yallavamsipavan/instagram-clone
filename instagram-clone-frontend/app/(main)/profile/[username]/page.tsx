@@ -14,6 +14,7 @@ import PostGrid from '@/components/profile/PostGrid';
 import FollowListModal from '@/components/profile/FollowListModal';
 import EditProfileModal from '@/components/profile/EditProfileModal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import { GridSkeleton, ProfileHeaderSkeleton } from '@/components/ui/Skeleton';
 
 export default function ProfilePage() {
   const params = useParams<{ username: string }>();
@@ -124,8 +125,10 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-20">
-        <div className="w-8 h-8 border-2 border-zinc-700 border-t-pink-400 rounded-full animate-spin" />
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <ProfileHeaderSkeleton />
+        <div className="border-t border-zinc-800 mb-1" />
+        <GridSkeleton />
       </div>
     );
   }
